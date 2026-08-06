@@ -1,0 +1,125 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function claims() {
+      return request.auth.token;
+    }
+
+    function role() {
+      return claims().role;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && role() == 'super-admin';
+    }
+
+    function isAdminOfContract(contractId) {
+      return isSignedIn() && role() == 'admin' && claims().contractId == contractId;
+    }
+
+    function isSupervisorOfField(fieldId) {
+      return isSignedIn() && role() == 'supervisor' && claims().fieldId == fieldId;
+    }
+
+    function isEmployee(uid) {
+      return isSignedIn() && role() == 'employee' && request.auth.uid == uid;
+    }
+
+    function isContractMember(contractId) {
+      return isSignedIn() && claims().contractId == contractId;
+    }
+
+    // ---- users ----
+    // Cada usuario lee/edita su propio perfil espejo. Admin/super-admin leen los de su contrato.
+    match /users/{uid} {
+      allow get: if isSuperAdmin()
+        || request.auth.uid == uid
+        || (isSignedIn() && claims().contractId == resource.data.contractId
+            && (role() == 'admin' || role() == 'supervisor'));
+      allow list: if isSuperAdmin()
+        || (isSignedIn() && (role() == 'admin' || role() == 'supervisor'));
+      // La creación/actualización de rol y jerarquía SOLO ocurre vía Admin SDK (Route Handlers).
+      allow write: if false;
+    }
+
+    // ---- contracts ----
+    match /contracts/{contractId} {
+      allow get: if isSuperAdmin() || isAdminOfContract(contractId) || isContractMember(contractId);
+      allow list: if isSuperAdmin();
+      allow write: if false; // solo Route Handlers vía Admin SDK
+    }
+
+    // ---- fields ----
+    match /fields/{fieldId} {
+      allow get: if isSuperAdmin()
+        || isAdminOfContract(resource.data.contractId)
+        || isContractMember(resource.data.contractId);
+      allow list: if isSuperAdmin() || isSignedIn();
+      allow write: if false;
+    }
+
+    // ---- invites ----
+    // Nunca legibles/escribibles directamente desde el cliente: se resuelven vía Route Handler
+    // con Admin SDK (bypassa Security Rules) para poder validar antes de que exista sesión.
+    match /invites/{token} {
+      allow read, write: if false;
+    }
+
+    // ---- employees / supervisors / administrators (listados derivados de solo lectura) ----
+    match /employees/{uid} {
+      allow get, list: if isSuperAdmin()
+        || (isSignedIn() && claims().contractId == resource.data.contractId
+            && (role() == 'admin' || (role() == 'supervisor' && request.auth.uid == resource.data.supervisorId)));
+      allow write: if false;
+    }
+
+    match /supervisors/{uid} {
+      allow get, list: if isSuperAdmin()
+        || (isSignedIn() && role() == 'admin' && claims().contractId == resource.data.contractId);
+      allow write: if false;
+    }
+
+    match /administrators/{uid} {
+      allow get, list: if isSuperAdmin();
+      allow write: if false;
+    }
+
+    // ---- leaveRequests ----
+    match /leaveRequests/{requestId} {
+      allow get: if isSuperAdmin()
+        || isAdminOfContract(resource.data.contractId)
+        || isSupervisorOfField(resource.data.fieldId)
+        || isEmployee(resource.data.employeeId);
+
+      allow list: if isSuperAdmin()
+        || isSignedIn(); // el filtrado real ocurre en la query (where contractId/fieldId/employeeId ==)
+
+      // Todas las escrituras de transición de estado, firmas y generación de PDF
+      // pasan por Route Handlers (Admin SDK) para poder validar la máquina de estados
+      // de forma centralizada. El cliente nunca escribe leaveRequests directamente.
+      allow write: if false;
+    }
+
+    // ---- activities ----
+    match /activities/{activityId} {
+      allow get: if isSignedIn() && request.auth.uid in resource.data.targetUserIds;
+      allow list: if isSignedIn();
+      allow update: if isSignedIn()
+        && request.auth.uid in resource.data.targetUserIds
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy']);
+      allow create, delete: if false;
+    }
+
+    // ---- auditLogs ----
+    match /auditLogs/{logId} {
+      allow get, list: if isSuperAdmin();
+      allow write: if false; // solo Admin SDK
+    }
+  }
+}
