@@ -4,6 +4,7 @@ import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { requireRole } from "@/lib/auth/session";
 import { logAudit } from "@/lib/audit/log";
 import { getClientIp } from "@/lib/http/ip";
+import type { Role } from "@/types/domain";
 
 const bodySchema = z.object({ newPassword: z.string().min(8).max(128) });
 
@@ -12,7 +13,7 @@ export async function POST(
   { params }: { params: Promise<{ uid: string }> }
 ) {
   try {
-    const actor = await requireRole("super-admin");
+    const actor = await requireRole("super-admin", "admin");
     const { uid } = await params;
     const parsed = bodySchema.safeParse(await request.json());
     if (!parsed.success) {
@@ -26,7 +27,25 @@ export async function POST(
     if (!userSnap.exists) {
       return NextResponse.json({ ok: false, error: "Usuario no encontrado" }, { status: 404 });
     }
-    const targetUser = userSnap.data() as { contractId: string | null; email: string; name: string };
+    const targetUser = userSnap.data() as {
+      contractId: string | null;
+      role: Role;
+      email: string;
+      name: string;
+    };
+
+    // Un admin solo puede restablecer contraseñas de supervisores/empleados de su propio
+    // contrato; el super-admin puede hacerlo con cualquier usuario del sistema.
+    if (actor.role === "admin") {
+      const sameContract = targetUser.contractId === actor.contractId;
+      const allowedRole = targetUser.role === "supervisor" || targetUser.role === "employee";
+      if (!sameContract || !allowedRole) {
+        return NextResponse.json(
+          { ok: false, error: "No autorizado para modificar este usuario" },
+          { status: 403 }
+        );
+      }
+    }
 
     await adminAuth.updateUser(uid, { password: parsed.data.newPassword });
 

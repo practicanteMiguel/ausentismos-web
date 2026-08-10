@@ -156,7 +156,7 @@ export default async function ContractDetailPage({
                           return (
                             <div key={supervisor.id} className="space-y-2">
                               <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                                <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-[var(--chart-3)]/10 text-[var(--chart-3)]">
+                                <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-(--chart-3)/10 text-chart-3">
                                   <UserCog className="size-3.5" />
                                 </div>
                                 Supervisor
