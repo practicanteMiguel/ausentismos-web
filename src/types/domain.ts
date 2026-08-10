@@ -352,7 +352,8 @@ export type AuditAction =
   | "LEAVE_REQUEST_APPROVED"
   | "LEAVE_REQUEST_REJECTED"
   | "PDF_GENERATED"
-  | "PDF_DOWNLOADED";
+  | "PDF_DOWNLOADED"
+  | "PASSWORD_RESET";
 
 export interface AuditLog {
   id: string;

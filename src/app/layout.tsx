@@ -26,9 +26,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       {/* h-dvh (no h-full) para que en navegadores móviles, donde la barra de
-          direcciones cambia de tamaño, el layout no exceda el viewport real y
-          termine haciendo scroll toda la página en vez de solo el <main>. */}
-      <body className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
+          direcciones cambia de tamaño, el layout no exceda el viewport real. No lleva
+          overflow-hidden: el AppShell (dashboard) ya scrollea internamente en su <main> y
+          encaja exacto en h-dvh, pero landing/login necesitan que el body scrollee cuando
+          su contenido es más alto que el viewport (p.ej. en móvil). */}
+      <body className="flex h-dvh flex-col overflow-y-auto bg-background text-foreground">
         <AuthProvider>{children}</AuthProvider>
         <Toaster richColors position="top-right" />
       </body>
