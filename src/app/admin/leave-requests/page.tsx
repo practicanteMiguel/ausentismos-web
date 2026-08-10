@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { LeaveRequestStatusBadge } from "@/components/leave-requests/LeaveRequestStatusBadge";
 import { RetryPdfButton } from "@/components/leave-requests/RetryPdfButton";
 import { LEAVE_TYPE_LABEL, type FieldDoc, type LeaveRequest } from "@/types/domain";
@@ -20,14 +21,18 @@ import { LEAVE_TYPE_LABEL, type FieldDoc, type LeaveRequest } from "@/types/doma
 export default async function AdminLeaveRequestsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; fieldId?: string }>;
 }) {
   const admin = await requireRoleOrRedirect("admin");
-  const { month } = await searchParams;
+  const { month, fieldId } = await searchParams;
 
   let query = adminDb
     .collection("leaveRequests")
     .where("contractId", "==", admin.contractId) as FirebaseFirestore.Query;
+
+  if (fieldId) {
+    query = query.where("fieldId", "==", fieldId);
+  }
 
   if (month) {
     const [yearStr, monthStr] = month.split("-");
@@ -48,7 +53,8 @@ export default async function AdminLeaveRequestsPage({
     adminDb.collection("fields").where("contractId", "==", admin.contractId).get(),
   ]);
   const requests = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<LeaveRequest, "id">) }));
-  const fieldNameById = new Map(fieldsSnap.docs.map((d) => [d.id, (d.data() as FieldDoc).name]));
+  const fields = fieldsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<FieldDoc, "id">) }));
+  const fieldNameById = new Map(fields.map((f) => [f.id, f.name]));
 
   return (
     <div className="space-y-6">
@@ -64,10 +70,21 @@ export default async function AdminLeaveRequestsPage({
           <Label htmlFor="month">Mes</Label>
           <Input id="month" name="month" type="month" defaultValue={month} className="w-40" />
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="fieldId">Campo</Label>
+          <NativeSelect id="fieldId" name="fieldId" defaultValue={fieldId ?? ""} className="w-44">
+            <option value="">Todos los campos</option>
+            {fields.map((field) => (
+              <option key={field.id} value={field.id}>
+                {field.name}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
         <Button type="submit" variant="outline">
           Filtrar
         </Button>
-        {month && (
+        {(month || fieldId) && (
           <Button
             type="button"
             variant="ghost"
@@ -81,7 +98,9 @@ export default async function AdminLeaveRequestsPage({
 
       {requests.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {month ? "No hay solicitudes en ese mes." : "No hay solicitudes registradas todavía."}
+          {month || fieldId
+            ? "No hay solicitudes para los filtros seleccionados."
+            : "No hay solicitudes registradas todavía."}
         </p>
       ) : (
         <Table>

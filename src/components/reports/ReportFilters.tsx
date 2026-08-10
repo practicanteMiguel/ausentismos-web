@@ -4,13 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/native-select";
 import {
   Table,
   TableBody,
@@ -96,20 +90,20 @@ export function ReportFilters({ fields }: ReportFiltersProps) {
           <Input id="to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
         <div className="space-y-2">
-          <Label>Campo</Label>
-          <Select value={fieldId} onValueChange={(v) => setFieldId(v ?? "all")}>
-            <SelectTrigger className="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los campos</SelectItem>
-              {fields.map((f) => (
-                <SelectItem key={f.id} value={f.id}>
-                  {f.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label htmlFor="report-fieldId">Campo</Label>
+          <NativeSelect
+            id="report-fieldId"
+            className="w-48"
+            value={fieldId}
+            onChange={(e) => setFieldId(e.target.value)}
+          >
+            <option value="all">Todos los campos</option>
+            {fields.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </NativeSelect>
         </div>
         <Button onClick={handleSearch} disabled={loading}>
           <Search className="size-4" />
