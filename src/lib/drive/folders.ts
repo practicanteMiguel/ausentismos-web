@@ -47,26 +47,34 @@ const MONTH_NAMES_ES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-/** Resuelve/crea Ausentismos/Contrato_{n}/{año}/{Mes}/{Campo}, devolviendo el folderId final. */
+/**
+ * Resuelve/crea Ausentismos/Contrato_{n}/{año}/{Mes}/{Campo}/{Empleado}, devolviendo el
+ * folderId final. La carpeta por empleado agrupa ahí el PDF del ausentismo junto con sus
+ * documentos de soporte; si el empleado tiene varios ausentismos el mismo mes, todos caen en
+ * esa misma carpeta (ensureFolder es idempotente: la busca por nombre antes de crearla).
+ */
 export async function ensureLeaveRequestFolderPath(params: {
   contractNumber: string;
   fieldName: string;
+  employeeName: string;
   date: Date;
 }): Promise<string> {
   const contractFolder = await ensureFolder(`Contrato_${params.contractNumber}`, rootFolderId());
   const yearFolder = await ensureFolder(String(params.date.getFullYear()), contractFolder);
   const monthFolder = await ensureFolder(MONTH_NAMES_ES[params.date.getMonth()], yearFolder);
   const fieldFolder = await ensureFolder(params.fieldName, monthFolder);
-  return fieldFolder;
+  const employeeFolder = await ensureFolder(params.employeeName, fieldFolder);
+  return employeeFolder;
 }
 
 export async function ensureContractFolder(contractNumber: string): Promise<string> {
   return ensureFolder(`Contrato_${contractNumber}`, rootFolderId());
 }
 
-export async function uploadPdfToDrive(params: {
+export async function uploadFileToDrive(params: {
   folderId: string;
   fileName: string;
+  mimeType: string;
   bytes: Uint8Array;
 }): Promise<{ id: string; webViewLink: string }> {
   const drive = getDrive();
@@ -78,7 +86,7 @@ export async function uploadPdfToDrive(params: {
       parents: [params.folderId],
     },
     media: {
-      mimeType: "application/pdf",
+      mimeType: params.mimeType,
       body: stream,
     },
     fields: "id, webViewLink",
@@ -86,22 +94,39 @@ export async function uploadPdfToDrive(params: {
   });
 
   if (!created.data.id || !created.data.webViewLink) {
-    throw new Error("No se pudo subir el PDF a Google Drive.");
+    throw new Error("No se pudo subir el archivo a Google Drive.");
   }
 
   return { id: created.data.id, webViewLink: created.data.webViewLink };
 }
 
+export async function uploadPdfToDrive(params: {
+  folderId: string;
+  fileName: string;
+  bytes: Uint8Array;
+}): Promise<{ id: string; webViewLink: string }> {
+  return uploadFileToDrive({ ...params, mimeType: "application/pdf" });
+}
+
 /**
- * Descarga el binario de un PDF desde Drive usando el Service Account (que siempre tiene acceso,
- * al ser quien lo subió). Así el servidor puede servirlo directo al navegador sin que el usuario
- * final necesite ningún permiso de Drive — la carpeta es privada y nunca se comparte con empleados.
+ * Descarga el binario de un archivo desde Drive usando el Service Account (que siempre tiene
+ * acceso, al ser quien lo subió). Así el servidor puede servirlo directo al navegador sin que
+ * el usuario final necesite ningún permiso de Drive — la carpeta es privada y nunca se comparte
+ * con empleados. Sirve tanto para el PDF del ausentismo como para sus documentos de soporte.
  */
-export async function downloadPdfFromDrive(fileId: string): Promise<Buffer> {
+export async function downloadFileFromDrive(fileId: string): Promise<Buffer> {
   const drive = getDrive();
   const response = await drive.files.get(
     { fileId, alt: "media", supportsAllDrives: true },
     { responseType: "arraybuffer" }
   );
   return Buffer.from(response.data as ArrayBuffer);
+}
+
+export const downloadPdfFromDrive = downloadFileFromDrive;
+
+/** Elimina permanentemente un archivo de Drive (sin pasar por la papelera). */
+export async function deleteDriveFile(fileId: string): Promise<void> {
+  const drive = getDrive();
+  await drive.files.delete({ fileId, supportsAllDrives: true });
 }

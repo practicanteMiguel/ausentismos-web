@@ -282,6 +282,18 @@ export interface LeaveRequestHistoryEntry {
   note?: string;
 }
 
+/**
+ * Documento de soporte (médico, no médico o extralegal) adjuntado por el empleado al crear el
+ * ausentismo. Se sube a Drive al momento de la creación (junto al empleado, ver folders.ts) y
+ * solo se conserva ahí si la solicitud termina aprobada; si el supervisor rechaza, se elimina
+ * de Drive y este arreglo se vacía (ver review/route.ts).
+ */
+export interface SupportFile {
+  driveFileId: string;
+  name: string;
+  mimeType: string;
+}
+
 export interface LeaveRequestPdf {
   driveFileId: string;
   webViewLink: string;
@@ -317,6 +329,8 @@ export interface LeaveRequest {
   medicalSupport: MedicalSupport | null;
   /** Obligatorio solo si LEAVE_TYPE_GROUP[type] es 'NO_MEDICO' o 'EXTRALEGAL'. */
   nonMedicalSupportDescription: string | null;
+  /** Máximo 2 (ver SupportFile). Opcional en cualquier grupo, pero solo se ofrece subir en MEDICO/NO_MEDICO/EXTRALEGAL. */
+  supportFiles: SupportFile[];
   status: LeaveRequestStatus;
   employeeSignature: SignatureData | null;
   supervisorSignature: SignatureData | null;

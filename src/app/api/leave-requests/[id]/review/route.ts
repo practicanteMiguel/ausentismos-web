@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit/log";
 import { logActivity } from "@/lib/activity/log";
 import { getClientIp } from "@/lib/http/ip";
 import { generateAndArchivePdf } from "@/lib/leaveRequests/generatePdf";
+import { deleteDriveFile } from "@/lib/drive/folders";
 import type { LeaveRequest, LeaveRequestHistoryEntry } from "@/types/domain";
 
 const bodySchema = z.discriminatedUnion("action", [
@@ -49,6 +50,14 @@ export async function PATCH(
   const now = Timestamp.now();
 
   if (parsed.data.action === "reject") {
+    // Los documentos de soporte se subieron a Drive al crear la solicitud; si se rechaza, no debe
+    // quedar nada archivado — se eliminan de Drive (best-effort) y se vacía la referencia.
+    // ?? [] por compatibilidad con solicitudes creadas antes de este campo.
+    const supportFiles = leaveRequest.supportFiles ?? [];
+    if (supportFiles.length > 0) {
+      await Promise.allSettled(supportFiles.map((file) => deleteDriveFile(file.driveFileId)));
+    }
+
     const history: LeaveRequestHistoryEntry[] = [
       ...leaveRequest.history,
       { status: "RECHAZADO", at: now, byUid: supervisor.uid, byName: supervisor.name, note: parsed.data.rejectionReason },
@@ -56,6 +65,7 @@ export async function PATCH(
     await requestRef.update({
       status: "RECHAZADO",
       rejectionReason: parsed.data.rejectionReason,
+      supportFiles: [],
       history,
       updatedAt: now,
     });

@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { LeaveRequestStatusBadge } from "@/components/leave-requests/LeaveRequestStatusBadge";
 import { LeaveRequestPdfPreview } from "@/components/leave-requests/LeaveRequestPdfPreview";
 import { ZoomableDocument } from "@/components/leave-requests/ZoomableDocument";
+import { FileText, Image as ImageIcon, Paperclip } from "lucide-react";
 import type { LeaveRequestView } from "@/lib/leaveRequests/viewModel";
 
 interface LeaveRequestDetailCardProps {
@@ -24,6 +26,31 @@ export function LeaveRequestDetailCard({
       </div>
       {request.rejectionReason && (
         <p className="text-sm text-destructive">Motivo de rechazo: {request.rejectionReason}</p>
+      )}
+      {request.supportFiles.length > 0 && (
+        <div className="space-y-1.5 rounded-md border p-3">
+          <p className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+            <Paperclip className="size-4" />
+            Documentos de soporte
+          </p>
+          <ul className="space-y-1">
+            {request.supportFiles.map((file) => {
+              const Icon = file.mimeType === "application/pdf" ? FileText : ImageIcon;
+              return (
+                <li key={file.driveFileId}>
+                  <Link
+                    href={`/api/leave-requests/${request.id}/support-files/${file.driveFileId}`}
+                    target="_blank"
+                    className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+                  >
+                    <Icon className="size-4 shrink-0" />
+                    <span className="truncate">{file.name}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
       <ZoomableDocument actions={actions}>
         <LeaveRequestPdfPreview

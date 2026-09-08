@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SignaturePad } from "@/components/signature/SignaturePad";
+import { SupportFileUpload, type SupportFileValue } from "@/components/forms/SupportFileUpload";
 import {
   LeaveRequestPdfPreview,
   type LeaveRequestPreviewData,
@@ -58,6 +59,7 @@ export function LeaveRequestForm({
   const [medicalNotifiedAt, setMedicalNotifiedAt] = useState("");
   const [medicalMethod, setMedicalMethod] = useState<SupportMethod | "">("");
   const [nonMedicalSupportDescription, setNonMedicalSupportDescription] = useState("");
+  const [supportFiles, setSupportFiles] = useState<SupportFileValue[]>([]);
 
   const group = type ? LEAVE_TYPE_GROUP[type] : null;
   const isMedical = group === "MEDICO";
@@ -122,6 +124,7 @@ export function LeaveRequestForm({
           medicalNotifiedAt: isMedical ? medicalNotifiedAt : null,
           medicalMethod: isMedical ? medicalMethod : null,
           nonMedicalSupportDescription: isOtherSupport ? nonMedicalSupportDescription : null,
+          supportFiles,
           employeeSignatureDataUrl: dataUrl,
         }),
       });
@@ -328,6 +331,7 @@ export function LeaveRequestForm({
                         </label>
                       ))}
                     </RadioGroup>
+                    <SupportFileUpload files={supportFiles} onChange={setSupportFiles} />
                   </div>
                 )}
 
@@ -345,6 +349,7 @@ export function LeaveRequestForm({
                       value={nonMedicalSupportDescription}
                       onChange={(e) => setNonMedicalSupportDescription(e.target.value)}
                     />
+                    <SupportFileUpload files={supportFiles} onChange={setSupportFiles} />
                   </div>
                 )}
 

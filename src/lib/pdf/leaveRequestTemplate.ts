@@ -2,6 +2,7 @@ import "server-only";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb, type RGB } from "pdf-lib";
+import { decodeDataUrl } from "@/lib/dataUrl";
 import {
   LEAVE_ORIGIN_GROUP_LABEL,
   LEAVE_TYPE_GROUPS,
@@ -21,11 +22,6 @@ const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
 const MARGIN = 36;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
-
-function decodeDataUrl(dataUrl: string): Uint8Array {
-  const base64 = dataUrl.split(",")[1] ?? dataUrl;
-  return new Uint8Array(Buffer.from(base64, "base64"));
-}
 
 /**
  * Fechas de solo-día (`startDate`/`endDate`/notificación) se guardan como medianoche UTC

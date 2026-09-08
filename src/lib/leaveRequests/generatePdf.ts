@@ -39,14 +39,17 @@ export async function generateAndArchivePdf(requestId: string): Promise<void> {
     fieldName: field.name,
   });
 
-  const now = new Date();
+  // Usa la fecha de creación de la solicitud (no "ahora") para que el PDF caiga en la misma
+  // carpeta de empleado donde ya están sus documentos de soporte, subidos al momento de crear
+  // la solicitud — si la aprobación ocurre en un mes distinto al de la creación, deben coincidir.
   const folderId = await ensureLeaveRequestFolderPath({
     contractNumber: contract.number,
     fieldName: field.name,
-    date: now,
+    employeeName: leaveRequest.employeeName,
+    date: leaveRequest.createdAt.toDate(),
   });
 
-  const datePrefix = now.toISOString().slice(0, 10).replace(/-/g, "");
+  const datePrefix = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   const fileName = `${datePrefix}_${leaveRequest.employeeCedula}_${slugify(leaveRequest.employeeName)}.pdf`;
 
   const uploaded = await uploadPdfToDrive({ folderId, fileName, bytes });

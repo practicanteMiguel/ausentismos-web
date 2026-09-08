@@ -1,5 +1,11 @@
 import "server-only";
-import type { LeaveRequest, LeaveRequestStatus, LeaveType, SupportMethod } from "@/types/domain";
+import type {
+  LeaveRequest,
+  LeaveRequestStatus,
+  LeaveType,
+  SupportFile,
+  SupportMethod,
+} from "@/types/domain";
 
 /**
  * Subconjunto plano y serializable de LeaveRequest, con los Timestamp de Firestore Admin
@@ -23,6 +29,7 @@ export interface LeaveRequestView {
   isPaid: boolean;
   medicalSupport: { notifiedAt: Date; method: SupportMethod } | null;
   nonMedicalSupportDescription: string | null;
+  supportFiles: SupportFile[];
   rejectionReason: string | null;
   createdAt: Date;
   employeeSignature: { dataUrl: string; position: string } | null;
@@ -54,6 +61,8 @@ export function toLeaveRequestView(r: LeaveRequest): LeaveRequestView {
       ? { notifiedAt: r.medicalSupport.notifiedAt.toDate(), method: r.medicalSupport.method }
       : null,
     nonMedicalSupportDescription: r.nonMedicalSupportDescription,
+    // ?? [] por compatibilidad con solicitudes creadas antes de este campo.
+    supportFiles: r.supportFiles ?? [],
     rejectionReason: r.rejectionReason,
     createdAt: r.createdAt.toDate(),
     employeeSignature: r.employeeSignature

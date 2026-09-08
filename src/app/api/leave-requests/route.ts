@@ -7,14 +7,20 @@ import { logAudit } from "@/lib/audit/log";
 import { logActivity } from "@/lib/activity/log";
 import { getClientIp } from "@/lib/http/ip";
 import { calcLeaveDays, calcLeaveHours } from "@/lib/leaveRequests/calc";
+import { decodeDataUrl } from "@/lib/dataUrl";
+import { ensureLeaveRequestFolderPath, uploadFileToDrive } from "@/lib/drive/folders";
 import {
   LEAVE_TYPE_GROUP,
   OTRA_LEAVE_TYPES,
+  type Contract,
+  type FieldDoc,
   type LeaveRequestHistoryEntry,
   type LeaveType,
+  type SupportFile,
 } from "@/types/domain";
 
 const LEAVE_TYPES = Object.keys(LEAVE_TYPE_GROUP) as [LeaveType, ...LeaveType[]];
+const MAX_SUPPORT_FILES = 2;
 
 const bodySchema = z
   .object({
@@ -36,6 +42,19 @@ const bodySchema = z
     medicalNotifiedAt: z.string().nullable(),
     medicalMethod: z.enum(["CORREO_ELECTRONICO", "RADICADO_PRESENCIAL"]).nullable(),
     nonMedicalSupportDescription: z.string().trim().max(2000).nullable(),
+    supportFiles: z
+      .array(
+        z.object({
+          name: z.string().trim().min(1).max(200),
+          mimeType: z
+            .string()
+            .refine((t) => t === "application/pdf" || t.startsWith("image/"), {
+              message: "Los documentos de soporte deben ser PDF o imagen.",
+            }),
+          dataUrl: z.string().regex(/^data:[\w./+-]+;base64,/),
+        })
+      )
+      .max(MAX_SUPPORT_FILES),
     employeeSignatureDataUrl: z.string().startsWith("data:image/png;base64,"),
   })
   .superRefine((data, ctx) => {
@@ -101,6 +120,48 @@ export async function POST(request: NextRequest) {
   const numDays = calcLeaveDays(startDate, endDate, data.workSchedule);
   const numHours = calcLeaveHours(numDays, data.startTime, data.endTime);
 
+  // Los documentos de soporte se suben a Drive ya al crear la solicitud (no al aprobarla): si el
+  // supervisor rechaza, se eliminan (ver review/route.ts) — así nunca queda nada archivado de una
+  // solicitud rechazada, cumpliendo el pedido de "si se rechaza no debe guardar nada".
+  let supportFiles: SupportFile[] = [];
+  if (data.supportFiles.length > 0) {
+    const [contractSnap, fieldSnap] = await Promise.all([
+      adminDb.collection("contracts").doc(employee.contractId!).get(),
+      adminDb.collection("fields").doc(employee.fieldId!).get(),
+    ]);
+    const contract = contractSnap.data() as Omit<Contract, "id"> | undefined;
+    const field = fieldSnap.data() as Omit<FieldDoc, "id"> | undefined;
+    if (!contract || !field) {
+      return NextResponse.json({ ok: false, error: "Contrato o campo no encontrado" }, { status: 404 });
+    }
+
+    try {
+      const folderId = await ensureLeaveRequestFolderPath({
+        contractNumber: contract.number,
+        fieldName: field.name,
+        employeeName: userData.name,
+        date: new Date(),
+      });
+      const datePrefix = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      supportFiles = await Promise.all(
+        data.supportFiles.map(async (file, index) => {
+          const uploaded = await uploadFileToDrive({
+            folderId,
+            fileName: `${datePrefix}_Soporte${index + 1}_${file.name}`,
+            mimeType: file.mimeType,
+            bytes: decodeDataUrl(file.dataUrl),
+          });
+          return { driveFileId: uploaded.id, name: file.name, mimeType: file.mimeType };
+        })
+      );
+    } catch {
+      return NextResponse.json(
+        { ok: false, error: "No se pudieron subir los documentos de soporte. Intenta de nuevo." },
+        { status: 502 }
+      );
+    }
+  }
+
   const now = Timestamp.now();
   const history: LeaveRequestHistoryEntry[] = [
     { status: "ENVIADO", at: now, byUid: employee.uid, byName: userData.name },
@@ -130,6 +191,7 @@ export async function POST(request: NextRequest) {
       ? { notifiedAt: new Date(data.medicalNotifiedAt), method: data.medicalMethod }
       : null,
     nonMedicalSupportDescription: data.nonMedicalSupportDescription,
+    supportFiles,
     status: "PENDIENTE_SUPERVISOR",
     employeeSignature: {
       dataUrl: data.employeeSignatureDataUrl,
