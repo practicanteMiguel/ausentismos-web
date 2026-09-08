@@ -9,6 +9,7 @@ import { getClientIp } from "@/lib/http/ip";
 import { calcLeaveDays, calcLeaveHours } from "@/lib/leaveRequests/calc";
 import { decodeDataUrl } from "@/lib/dataUrl";
 import { ensureLeaveRequestFolderPath, uploadFileToDrive } from "@/lib/drive/folders";
+import { getOrCreateAdministracionField } from "@/lib/fields/administracion";
 import {
   LEAVE_TYPE_GROUP,
   OTRA_LEAVE_TYPES,
@@ -113,7 +114,10 @@ const bodySchema = z
   });
 
 export async function POST(request: NextRequest) {
-  const employee = await requireRole("employee");
+  // Empleado: como siempre, revisa su supervisor. Supervisor/admin: ahora también pueden crear
+  // su propio ausentismo — sube un nivel en la jerarquía y lo revisa el coordinador del contrato
+  // (mismo mecanismo de siempre, no se toca nada de lo que ya existía para empleado→supervisor).
+  const requester = await requireRole("employee", "supervisor", "admin");
   const parsed = bodySchema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json(
@@ -123,10 +127,37 @@ export async function POST(request: NextRequest) {
   }
   const data = parsed.data;
 
-  const userSnap = await adminDb.collection("users").doc(employee.uid).get();
+  const userSnap = await adminDb.collection("users").doc(requester.uid).get();
   const userData = userSnap.data();
   if (!userData) {
     return NextResponse.json({ ok: false, error: "Perfil de usuario no encontrado" }, { status: 404 });
+  }
+
+  let fieldId: string;
+  let reviewerId: string;
+  if (requester.role === "employee") {
+    fieldId = requester.fieldId!;
+    reviewerId = requester.supervisorId!;
+  } else {
+    const coordinatorSnap = await adminDb
+      .collection("coordinators")
+      .where("contractId", "==", requester.contractId)
+      .limit(1)
+      .get();
+    if (coordinatorSnap.empty) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Tu contrato aún no tiene un coordinador asignado. Contacta al super-admin.",
+        },
+        { status: 409 }
+      );
+    }
+    reviewerId = coordinatorSnap.docs[0].id;
+    fieldId =
+      requester.role === "supervisor"
+        ? requester.fieldId!
+        : (await getOrCreateAdministracionField(requester.contractId!, requester.uid)).id;
   }
 
   const startDate = new Date(data.startDate);
@@ -134,14 +165,14 @@ export async function POST(request: NextRequest) {
   const numDays = calcLeaveDays(startDate, endDate, data.workSchedule);
   const numHours = calcLeaveHours(numDays, data.startTime, data.endTime);
 
-  // Los documentos de soporte se suben a Drive ya al crear la solicitud (no al aprobarla): si el
-  // supervisor rechaza, se eliminan (ver review/route.ts) — así nunca queda nada archivado de una
+  // Los documentos de soporte se suben a Drive ya al crear la solicitud (no al aprobarla): si
+  // se rechaza, se eliminan (ver review/route.ts) — así nunca queda nada archivado de una
   // solicitud rechazada, cumpliendo el pedido de "si se rechaza no debe guardar nada".
   let supportFiles: SupportFile[] = [];
   if (data.supportFiles.length > 0) {
     const [contractSnap, fieldSnap] = await Promise.all([
-      adminDb.collection("contracts").doc(employee.contractId!).get(),
-      adminDb.collection("fields").doc(employee.fieldId!).get(),
+      adminDb.collection("contracts").doc(requester.contractId!).get(),
+      adminDb.collection("fields").doc(fieldId).get(),
     ]);
     const contract = contractSnap.data() as Omit<Contract, "id"> | undefined;
     const field = fieldSnap.data() as Omit<FieldDoc, "id"> | undefined;
@@ -178,16 +209,16 @@ export async function POST(request: NextRequest) {
 
   const now = Timestamp.now();
   const history: LeaveRequestHistoryEntry[] = [
-    { status: "ENVIADO", at: now, byUid: employee.uid, byName: userData.name },
-    { status: "PENDIENTE_SUPERVISOR", at: now, byUid: employee.uid, byName: userData.name },
+    { status: "ENVIADO", at: now, byUid: requester.uid, byName: userData.name },
+    { status: "PENDIENTE_SUPERVISOR", at: now, byUid: requester.uid, byName: userData.name },
   ];
 
   const requestRef = adminDb.collection("leaveRequests").doc();
   await requestRef.set({
-    contractId: employee.contractId,
-    fieldId: employee.fieldId,
-    supervisorId: employee.supervisorId,
-    employeeId: employee.uid,
+    contractId: requester.contractId,
+    fieldId,
+    supervisorId: reviewerId,
+    employeeId: requester.uid,
     employeeName: userData.name,
     employeeCedula: userData.cedula ?? "",
     position: data.position,
@@ -210,7 +241,7 @@ export async function POST(request: NextRequest) {
     employeeSignature: {
       dataUrl: data.employeeSignatureDataUrl,
       signedAt: now,
-      signedByUid: employee.uid,
+      signedByUid: requester.uid,
       signedByName: userData.name,
       signedByCedula: userData.cedula ?? "",
       position: data.position,
@@ -224,8 +255,8 @@ export async function POST(request: NextRequest) {
   });
 
   await logAudit({
-    contractId: employee.contractId,
-    actorUid: employee.uid,
+    contractId: requester.contractId,
+    actorUid: requester.uid,
     actorName: userData.name,
     action: "LEAVE_REQUEST_CREATED",
     entityType: "leaveRequest",
@@ -235,19 +266,17 @@ export async function POST(request: NextRequest) {
     metadata: { type: data.type },
   });
 
-  if (employee.supervisorId) {
-    await logActivity({
-      contractId: employee.contractId,
-      fieldId: employee.fieldId,
-      targetUserIds: [employee.supervisorId],
-      actorUid: employee.uid,
-      actorName: userData.name,
-      type: "LEAVE_REQUEST_SUBMITTED",
-      title: "Nueva solicitud de ausentismo",
-      description: `${userData.name} envió una solicitud pendiente de tu revisión.`,
-      relatedEntity: { type: "leaveRequest", id: requestRef.id },
-    });
-  }
+  await logActivity({
+    contractId: requester.contractId,
+    fieldId,
+    targetUserIds: [reviewerId],
+    actorUid: requester.uid,
+    actorName: userData.name,
+    type: "LEAVE_REQUEST_SUBMITTED",
+    title: "Nueva solicitud de ausentismo",
+    description: `${userData.name} envió una solicitud pendiente de tu revisión.`,
+    relatedEntity: { type: "leaveRequest", id: requestRef.id },
+  });
 
   return NextResponse.json({ ok: true, data: { id: requestRef.id } });
 }

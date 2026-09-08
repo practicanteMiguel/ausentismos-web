@@ -27,6 +27,14 @@ service cloud.firestore {
       return isSignedIn() && role() == 'supervisor' && claims().fieldId == fieldId;
     }
 
+    // El coordinador revisa los ausentismos propios de supervisores/admin de su contrato: en
+    // esos documentos, supervisorId guarda el uid del coordinador asignado (mismo mecanismo de
+    // revisión que empleado→supervisor, un nivel más arriba).
+    function isCoordinatorOfRequest(contractId, reviewerId) {
+      return isSignedIn() && role() == 'coordinator'
+        && claims().contractId == contractId && request.auth.uid == reviewerId;
+    }
+
     function isEmployee(uid) {
       return isSignedIn() && role() == 'employee' && request.auth.uid == uid;
     }
@@ -90,11 +98,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /coordinators/{uid} {
+      allow get, list: if isSuperAdmin();
+      allow write: if false;
+    }
+
     // ---- leaveRequests ----
     match /leaveRequests/{requestId} {
       allow get: if isSuperAdmin()
         || isAdminOfContract(resource.data.contractId)
         || isSupervisorOfField(resource.data.fieldId)
+        || isCoordinatorOfRequest(resource.data.contractId, resource.data.supervisorId)
         || isEmployee(resource.data.employeeId);
 
       allow list: if isSuperAdmin()

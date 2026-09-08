@@ -47,7 +47,9 @@ export function InviteRegisterForm({
           name,
           email,
           password,
-          ...(role === "employee" || role === "supervisor" ? { cedula } : {}),
+          ...(role === "employee" || role === "supervisor" || role === "coordinator"
+            ? { cedula }
+            : {}),
         }),
       });
       const json = await response.json();
@@ -111,7 +113,7 @@ export function InviteRegisterForm({
             <Label htmlFor="name">Nombre completo</Label>
             <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
           </div>
-          {(role === "employee" || role === "supervisor") && (
+          {(role === "employee" || role === "supervisor" || role === "coordinator") && (
             <div className="space-y-2">
               <Label htmlFor="cedula">Cédula</Label>
               <Input

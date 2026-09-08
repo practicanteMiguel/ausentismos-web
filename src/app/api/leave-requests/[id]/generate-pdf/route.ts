@@ -5,7 +5,7 @@ import { generateAndArchivePdf } from "@/lib/leaveRequests/generatePdf";
 import type { LeaveRequest } from "@/types/domain";
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await requireRole("admin", "supervisor", "super-admin");
+  const user = await requireRole("admin", "supervisor", "coordinator", "super-admin");
   const { id } = await params;
 
   const snap = await adminDb.collection("leaveRequests").doc(id).get();

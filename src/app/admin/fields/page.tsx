@@ -5,6 +5,7 @@ import { FieldForm } from "@/components/forms/FieldForm";
 import { GenerateInviteButton } from "@/components/forms/GenerateInviteButton";
 import { UserListItem } from "@/components/users/UserListItem";
 import { UserCog, Users } from "lucide-react";
+import { ADMINISTRACION_FIELD_NAME } from "@/lib/fields/administracion";
 import type { FieldDoc, UserDoc } from "@/types/domain";
 
 export default async function FieldsPage() {
@@ -18,7 +19,11 @@ export default async function FieldsPage() {
     adminDb.collection("supervisors").where("contractId", "==", admin.contractId).get(),
     adminDb.collection("employees").where("contractId", "==", admin.contractId).get(),
   ]);
-  const fields = fieldsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<FieldDoc, "id">) }));
+  // El campo "Administración" es virtual (para los ausentismos propios del admin, ver
+  // lib/fields/administracion.ts) — no es un campo de trabajo real, así que no se lista aquí.
+  const fields = fieldsSnap.docs
+    .map((d) => ({ id: d.id, ...(d.data() as Omit<FieldDoc, "id">) }))
+    .filter((f) => f.name !== ADMINISTRACION_FIELD_NAME);
   const supervisors = supervisorsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<UserDoc, "id">) }));
   const employees = employeesSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<UserDoc, "id">) }));
 

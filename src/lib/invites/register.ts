@@ -73,6 +73,8 @@ export async function registerFromInvite(input: RegisterInput) {
     batch.set(adminDb.collection("supervisors").doc(userRecord.uid), userDoc);
   } else if (invite.role === "admin") {
     batch.set(adminDb.collection("administrators").doc(userRecord.uid), userDoc);
+  } else if (invite.role === "coordinator") {
+    batch.set(adminDb.collection("coordinators").doc(userRecord.uid), userDoc);
   }
 
   const inviteRef = adminDb.collection("invites").doc(input.token);
@@ -117,5 +119,10 @@ export async function registerFromInvite(input: RegisterInput) {
 }
 
 function roleLabel(role: InviteRole): string {
-  return { admin: "administrador", supervisor: "supervisor", employee: "empleado" }[role];
+  return {
+    admin: "administrador",
+    coordinator: "coordinador",
+    supervisor: "supervisor",
+    employee: "empleado",
+  }[role];
 }

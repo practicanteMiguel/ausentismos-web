@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ContractStatusBadge } from "@/components/contracts/ContractStatusBadge";
 import { RegenerateAdminInvite } from "@/components/contracts/RegenerateAdminInvite";
+import { RegenerateCoordinatorInvite } from "@/components/contracts/RegenerateCoordinatorInvite";
 import { UserListItem } from "@/components/users/UserListItem";
-import { ArrowLeft, ShieldCheck, Building2, UserCog, Users } from "lucide-react";
+import { ArrowLeft, ShieldCheck, UserCheck, Building2, UserCog, Users } from "lucide-react";
 import type { Contract, FieldDoc, UserDoc } from "@/types/domain";
 
 export default async function ContractDetailPage({
@@ -16,11 +17,12 @@ export default async function ContractDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [contractSnap, fieldsSnap, administratorsSnap, supervisorsSnap, employeesSnap] =
+  const [contractSnap, fieldsSnap, administratorsSnap, coordinatorsSnap, supervisorsSnap, employeesSnap] =
     await Promise.all([
       adminDb.collection("contracts").doc(id).get(),
       adminDb.collection("fields").where("contractId", "==", id).get(),
       adminDb.collection("administrators").where("contractId", "==", id).get(),
+      adminDb.collection("coordinators").where("contractId", "==", id).get(),
       adminDb.collection("supervisors").where("contractId", "==", id).get(),
       adminDb.collection("employees").where("contractId", "==", id).get(),
     ]);
@@ -29,6 +31,7 @@ export default async function ContractDetailPage({
   const contract = contractSnap.data() as Omit<Contract, "id">;
   const fields = fieldsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as FieldDoc);
   const administrators = administratorsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as UserDoc);
+  const coordinators = coordinatorsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as UserDoc);
   const supervisors = supervisorsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as UserDoc);
   const employees = employeesSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as UserDoc);
 
@@ -72,13 +75,22 @@ export default async function ContractDetailPage({
         <ContractStatusBadge status={contract.status} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Invitación de administrador</CardTitle>
           </CardHeader>
           <CardContent>
             <RegenerateAdminInvite contractId={id} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Invitación de coordinador</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <RegenerateCoordinatorInvite contractId={id} />
           </CardContent>
         </Card>
 
@@ -94,35 +106,69 @@ export default async function ContractDetailPage({
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <ShieldCheck className="size-4" />
-            </div>
-            Administrador ({administrators.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {administrators.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Aún no se ha registrado un administrador para este contrato.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {administrators.map((admin) => (
-                <UserListItem
-                  key={admin.id}
-                  uid={admin.id}
-                  name={admin.name}
-                  email={admin.email}
-                  status={admin.status}
-                />
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <ShieldCheck className="size-4" />
+              </div>
+              Administrador ({administrators.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {administrators.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aún no se ha registrado un administrador para este contrato.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {administrators.map((admin) => (
+                  <UserListItem
+                    key={admin.id}
+                    uid={admin.id}
+                    name={admin.name}
+                    email={admin.email}
+                    status={admin.status}
+                  />
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-(--chart-4)/10 text-chart-4">
+                <UserCheck className="size-4" />
+              </div>
+              Coordinador ({coordinators.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {coordinators.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aún no se ha registrado un coordinador para este contrato. Los ausentismos de
+                supervisores y del administrador quedarán pendientes hasta que se registre uno.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {coordinators.map((coordinator) => (
+                  <UserListItem
+                    key={coordinator.id}
+                    uid={coordinator.id}
+                    name={coordinator.name}
+                    email={coordinator.email}
+                    cedula={coordinator.cedula}
+                    status={coordinator.status}
+                  />
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <Card>
         <CardHeader>

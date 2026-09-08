@@ -8,7 +8,12 @@ export interface Timestamp {
   nanoseconds: number;
 }
 
-export type Role = "super-admin" | "admin" | "supervisor" | "employee";
+/**
+ * "coordinator" aprueba los ausentismos propios de los supervisores y del admin de su contrato
+ * (no de los empleados, que siguen yendo a su supervisor de siempre) — mismo mecanismo de
+ * revisión que ya existe para supervisor/empleado, un nivel más arriba en la jerarquía.
+ */
+export type Role = "super-admin" | "admin" | "supervisor" | "coordinator" | "employee";
 
 export type ContractStatus = "ACTIVO" | "VENCIDO" | "SUSPENDIDO";
 
@@ -248,7 +253,7 @@ export interface UserDoc {
   createdAt: Timestamp;
 }
 
-export type InviteRole = Extract<Role, "admin" | "supervisor" | "employee">;
+export type InviteRole = Extract<Role, "admin" | "coordinator" | "supervisor" | "employee">;
 
 export interface Invite {
   token: string;
@@ -385,6 +390,23 @@ export type AuditAction =
   | "PDF_GENERATED"
   | "PDF_DOWNLOADED"
   | "PASSWORD_RESET";
+
+export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
+  LOGIN: "Inicio de sesión",
+  USER_REGISTERED: "Usuario registrado",
+  CONTRACT_CREATED: "Contrato creado",
+  FIELD_CREATED: "Campo creado",
+  SUPERVISOR_CREATED: "Supervisor creado",
+  EMPLOYEE_CREATED: "Empleado creado",
+  LEAVE_REQUEST_CREATED: "Ausentismo creado",
+  EMPLOYEE_SIGNED: "Firma del empleado",
+  SUPERVISOR_SIGNED: "Firma del supervisor",
+  LEAVE_REQUEST_APPROVED: "Ausentismo aprobado",
+  LEAVE_REQUEST_REJECTED: "Ausentismo rechazado",
+  PDF_GENERATED: "PDF generado",
+  PDF_DOWNLOADED: "PDF descargado",
+  PASSWORD_RESET: "Contraseña restablecida",
+};
 
 export interface AuditLog {
   id: string;

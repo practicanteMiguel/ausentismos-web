@@ -10,7 +10,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await requireRole("employee", "supervisor", "admin", "super-admin");
+  const user = await requireRole("employee", "supervisor", "coordinator", "admin", "super-admin");
   const { id } = await params;
 
   const snap = await adminDb.collection("leaveRequests").doc(id).get();
@@ -23,6 +23,7 @@ export async function GET(
     user.role === "super-admin" ||
     (user.role === "admin" && leaveRequest.contractId === user.contractId) ||
     (user.role === "supervisor" && leaveRequest.supervisorId === user.uid) ||
+    (user.role === "coordinator" && leaveRequest.supervisorId === user.uid) ||
     (user.role === "employee" && leaveRequest.employeeId === user.uid);
   if (!authorized || !leaveRequest.pdf) {
     return NextResponse.json({ ok: false, error: "No autorizado" }, { status: 403 });

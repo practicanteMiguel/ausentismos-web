@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
 
-const PROTECTED_PREFIXES = ["/super-admin", "/admin", "/supervisor", "/employee"];
+const PROTECTED_PREFIXES = ["/super-admin", "/admin", "/supervisor", "/coordinator", "/employee"];
 
 // El Proxy (edge) solo verifica presencia de cookie (verifySessionCookie usa Node crypto,
 // no disponible en el runtime edge). La verificación real + chequeo de rol ocurre en cada
@@ -23,5 +23,11 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/super-admin/:path*", "/admin/:path*", "/supervisor/:path*", "/employee/:path*"],
+  matcher: [
+    "/super-admin/:path*",
+    "/admin/:path*",
+    "/supervisor/:path*",
+    "/coordinator/:path*",
+    "/employee/:path*",
+  ],
 };

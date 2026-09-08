@@ -23,7 +23,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supervisor = await requireRole("supervisor");
+  const supervisor = await requireRole("supervisor", "coordinator");
   const { id } = await params;
   const parsed = bodySchema.safeParse(await request.json());
   if (!parsed.success) {

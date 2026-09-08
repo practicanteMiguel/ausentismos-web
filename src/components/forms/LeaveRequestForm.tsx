@@ -46,6 +46,10 @@ interface LeaveRequestFormProps {
   employeeCedula: string;
   contractLabel: string;
   fieldLabel: string;
+  /** A dónde volver tras enviar. Por defecto el historial del empleado. */
+  redirectPath?: string;
+  /** A quién le llega la solicitud, para el mensaje de confirmación ("supervisor" | "coordinador"). */
+  reviewerLabel?: string;
 }
 
 export function LeaveRequestForm({
@@ -53,6 +57,8 @@ export function LeaveRequestForm({
   employeeCedula,
   contractLabel,
   fieldLabel,
+  redirectPath = "/employee/leave-requests",
+  reviewerLabel = "tu supervisor",
 }: LeaveRequestFormProps) {
   const router = useRouter();
   const [step, setStep] = useState<"form" | "signature">("form");
@@ -143,8 +149,8 @@ export function LeaveRequestForm({
       });
       const json = await response.json();
       if (!response.ok || !json.ok) throw new Error(json.error ?? "Error al enviar la solicitud");
-      toast.success("Solicitud enviada a tu supervisor");
-      router.push("/employee/leave-requests");
+      toast.success(`Solicitud enviada a ${reviewerLabel}`);
+      router.push(redirectPath);
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al enviar la solicitud");

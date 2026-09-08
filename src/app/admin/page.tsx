@@ -9,6 +9,7 @@ import { MonthlyAbsencesChart } from "@/components/dashboards/MonthlyAbsencesCha
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ClipboardList, FileText, Clock, Building2, BarChart3, Users, ArrowRight } from "lucide-react";
+import { ADMINISTRACION_FIELD_NAME } from "@/lib/fields/administracion";
 import type { FieldDoc, UserDoc } from "@/types/domain";
 
 export default async function AdminDashboard() {
@@ -30,7 +31,11 @@ export default async function AdminDashboard() {
       adminDb.collection("employees").where("contractId", "==", admin.contractId).get(),
     ]);
 
-  const fields = fieldsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<FieldDoc, "id">) }));
+  // El campo "Administración" es virtual (ausentismos propios del admin, ver
+  // lib/fields/administracion.ts) — no es un campo de trabajo real, así que no se lista aquí.
+  const fields = fieldsSnap.docs
+    .map((d) => ({ id: d.id, ...(d.data() as Omit<FieldDoc, "id">) }))
+    .filter((f) => f.name !== ADMINISTRACION_FIELD_NAME);
   const employeeCountByField = new Map<string, number>();
   for (const doc of employeesSnap.docs) {
     const fieldId = (doc.data() as UserDoc).fieldId;

@@ -5,7 +5,7 @@ import { InviteRegisterForm } from "@/components/forms/InviteRegisterForm";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { InviteRole } from "@/types/domain";
 
-const VALID_ROLES: InviteRole[] = ["admin", "supervisor", "employee"];
+const VALID_ROLES: InviteRole[] = ["admin", "coordinator", "supervisor", "employee"];
 
 interface InviteData {
   role: InviteRole;
