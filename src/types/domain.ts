@@ -185,6 +185,18 @@ export const LEAVE_TYPE_GROUPS: { group: LeaveOriginGroup; types: LeaveType[] }[
 
 export const OTRA_LEAVE_TYPES: LeaveType[] = ["OTRA_MEDICO", "OTRA_NO_MEDICO", "OTRA_EXTRALEGAL"];
 
+/**
+ * Turno de trabajo del empleado, usado para calcular numDays correctamente:
+ * "5x2" (lunes a viernes) no debe contar sábados/domingos dentro del rango; "6x6" sí trabaja
+ * fines de semana, así que ahí se cuentan todos los días del calendario (comportamiento previo).
+ */
+export type WorkSchedule = "5x2" | "6x6";
+
+export const WORK_SCHEDULE_LABEL: Record<WorkSchedule, string> = {
+  "5x2": "5x2 (lunes a viernes)",
+  "6x6": "6x6",
+};
+
 export type SupportMethod = "CORREO_ELECTRONICO" | "RADICADO_PRESENCIAL";
 
 export const SUPPORT_METHOD_LABEL: Record<SupportMethod, string> = {
@@ -295,6 +307,8 @@ export interface LeaveRequest {
   /** Hora "HH:mm", opcional — si se da una, no implica que la otra sea obligatoria a nivel de tipo. */
   startTime: string | null;
   endTime: string | null;
+  /** Determina si numDays cuenta o no los fines de semana dentro del rango (ver WorkSchedule). */
+  workSchedule: WorkSchedule;
   /** Calculados en servidor a partir de las fechas/horas, nunca confiados del cliente. */
   numDays: number;
   numHours: number | null;

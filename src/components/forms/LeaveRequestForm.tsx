@@ -26,6 +26,7 @@ import {
   SUPPORT_METHOD_LABEL,
   type LeaveType,
   type SupportMethod,
+  type WorkSchedule,
 } from "@/types/domain";
 
 interface LeaveRequestFormProps {
@@ -48,6 +49,7 @@ export function LeaveRequestForm({
   const [cargo, setCargo] = useState("");
   const [type, setType] = useState<LeaveType | "">("");
   const [otherReasonText, setOtherReasonText] = useState("");
+  const [workSchedule, setWorkSchedule] = useState<WorkSchedule>("6x6");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -63,7 +65,9 @@ export function LeaveRequestForm({
   const isOtra = type ? OTRA_LEAVE_TYPES.includes(type) : false;
 
   const numDays =
-    startDate && endDate ? calcLeaveDays(new Date(startDate), new Date(endDate)) : null;
+    startDate && endDate
+      ? calcLeaveDays(new Date(startDate), new Date(endDate), workSchedule)
+      : null;
   const numHours = numDays != null ? calcLeaveHours(numDays, startTime || null, endTime || null) : null;
 
   function handleStartDateChange(value: string) {
@@ -109,6 +113,7 @@ export function LeaveRequestForm({
           position: cargo,
           type,
           otherReasonText: isOtra ? otherReasonText : null,
+          workSchedule,
           startDate,
           endDate,
           startTime: startTime || null,
@@ -200,6 +205,20 @@ export function LeaveRequestForm({
 
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-muted-foreground">Fechas</h3>
+                  <div className="flex items-center gap-3 rounded-md border p-3">
+                    <Switch
+                      checked={workSchedule === "5x2"}
+                      onCheckedChange={(checked) => setWorkSchedule(checked ? "5x2" : "6x6")}
+                    />
+                    <div>
+                      <Label>{workSchedule === "5x2" ? "Turno: 5x2" : "Turno: 6x6"}</Label>
+                      <p className="text-xs text-muted-foreground">
+                        {workSchedule === "5x2"
+                          ? "Lunes a viernes: los sábados y domingos dentro del rango no se cuentan."
+                          : "Incluye fines de semana: se cuentan todos los días del rango."}
+                      </p>
+                    </div>
+                  </div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="startDate">Fecha de inicio</Label>

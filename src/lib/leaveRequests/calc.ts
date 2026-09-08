@@ -7,11 +7,32 @@
  * se leen y reconstruyen con los getters *UTC* (`getUTCFullYear`, etc.), nunca con los locales
  * (`getFullYear`) — mezclar ambos corre la fecha un día en zonas horarias negativas (ej. Colombia).
  */
+import type { WorkSchedule } from "@/types/domain";
 
-/** Días inclusivos entre dos fechas (mismo día = 1). Ignora la hora. */
-export function calcLeaveDays(startDate: Date, endDate: Date): number {
+/**
+ * Días inclusivos entre dos fechas (mismo día = 1). Ignora la hora.
+ *
+ * "6x6" cuenta todos los días del calendario (el empleado también puede trabajar fin de
+ * semana). "5x2" excluye sábados y domingos del rango: un ausentismo de viernes a lunes solo
+ * cuenta viernes y lunes, porque esos empleados no laboran los fines de semana.
+ */
+export function calcLeaveDays(
+  startDate: Date,
+  endDate: Date,
+  workSchedule: WorkSchedule = "6x6"
+): number {
   const start = Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate());
   const end = Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate());
+
+  if (workSchedule === "5x2") {
+    let count = 0;
+    for (let t = start; t <= end; t += 86_400_000) {
+      const dayOfWeek = new Date(t).getUTCDay(); // 0 = domingo, 6 = sábado
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) count++;
+    }
+    return Math.max(count, 1);
+  }
+
   const diff = Math.round((end - start) / 86_400_000);
   return Math.max(diff + 1, 1);
 }

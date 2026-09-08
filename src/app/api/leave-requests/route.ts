@@ -21,6 +21,7 @@ const bodySchema = z
     position: z.string().trim().min(2).max(120),
     type: z.enum(LEAVE_TYPES),
     otherReasonText: z.string().trim().max(300).nullable(),
+    workSchedule: z.enum(["5x2", "6x6"]),
     startDate: z.string().min(1),
     endDate: z.string().min(1),
     startTime: z
@@ -97,7 +98,7 @@ export async function POST(request: NextRequest) {
 
   const startDate = new Date(data.startDate);
   const endDate = new Date(data.endDate);
-  const numDays = calcLeaveDays(startDate, endDate);
+  const numDays = calcLeaveDays(startDate, endDate, data.workSchedule);
   const numHours = calcLeaveHours(numDays, data.startTime, data.endTime);
 
   const now = Timestamp.now();
@@ -121,6 +122,7 @@ export async function POST(request: NextRequest) {
     endDate,
     startTime: data.startTime,
     endTime: data.endTime,
+    workSchedule: data.workSchedule,
     numDays,
     numHours,
     isPaid: data.isPaid,
