@@ -66,6 +66,20 @@ const bodySchema = z
       });
     }
 
+    // Un día de margen respecto a la medianoche UTC de hoy: el empleado elige la fecha en su
+    // hora local (ej. Colombia, UTC-5) y ese "hoy" puede ya ser "mañana" en UTC durante la noche
+    // — sin este margen se rechazaría por error un "hoy" válido elegido en la última parte del día.
+    const todayUtcMidnight = new Date();
+    todayUtcMidnight.setUTCHours(0, 0, 0, 0);
+    const minAllowedDate = new Date(todayUtcMidnight.getTime() - 24 * 60 * 60 * 1000);
+    if (new Date(data.startDate) < minAllowedDate) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["startDate"],
+        message: "La fecha de inicio no puede ser anterior a hoy.",
+      });
+    }
+
     const group = LEAVE_TYPE_GROUP[data.type];
 
     if (OTRA_LEAVE_TYPES.includes(data.type) && !data.otherReasonText) {

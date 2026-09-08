@@ -1,6 +1,6 @@
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-linear-to-br from-[oklch(0.28_0.08_262)] via-[oklch(0.4_0.15_262)] to-[oklch(0.55_0.19_258)] p-4">
+    <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-y-auto overflow-x-hidden bg-linear-to-br from-[oklch(0.28_0.08_262)] via-[oklch(0.4_0.15_262)] to-[oklch(0.55_0.19_258)] p-4">
       {/* Mural decorativo: formas suaves difuminadas, puramente visual */}
       <div
         aria-hidden

@@ -299,6 +299,9 @@ export interface LeaveRequestPdf {
   webViewLink: string;
   generatedAt: Timestamp;
   templateVersion: number;
+  /** SHA-256 (hex) del PDF final, calculado al generarlo — evidencia de integridad: si el
+   *  archivo en Drive alguna vez cambia un solo byte, recalcular el hash ya no coincidirá. */
+  sha256: string;
 }
 
 export interface LeaveRequest {

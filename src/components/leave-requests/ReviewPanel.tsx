@@ -7,7 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { SignaturePad } from "@/components/signature/SignaturePad";
 import { LeaveRequestDetailCard } from "@/components/leave-requests/LeaveRequestDetailCard";
 import { CheckCircle2, XCircle } from "lucide-react";
@@ -65,6 +72,12 @@ export function ReviewPanel({ request, contractLabel, fieldLabel }: ReviewPanelP
 
   return (
     <div className="space-y-6">
+      <LoadingOverlay
+        open={loading}
+        title={mode === "approve" ? "Firmando y generando el ausentismo" : "Rechazando solicitud"}
+        description="Espera un momento, no cierres ni recargues esta ventana."
+      />
+
       <LeaveRequestDetailCard
         request={request}
         contractLabel={contractLabel}
@@ -72,17 +85,22 @@ export function ReviewPanel({ request, contractLabel, fieldLabel }: ReviewPanelP
         actions={idleActions}
       />
 
-      {canReview && mode === "approve" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Firma para aprobar</CardTitle>
-            <CardDescription>
+      <Dialog
+        open={canReview && mode === "approve"}
+        onOpenChange={(open) => {
+          if (!loading) setMode(open ? "approve" : "idle");
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Firma para aprobar</DialogTitle>
+            <DialogDescription>
               Con mi firma certifico que la información suministrada en el presente formato es
               veraz y que los documentos soporte adjuntos corresponden al motivo del ausentismo
               reportado.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="supervisorPosition">Cargo</Label>
               <Input
@@ -92,7 +110,7 @@ export function ReviewPanel({ request, contractLabel, fieldLabel }: ReviewPanelP
               />
             </div>
             <SignaturePad
-              confirmLabel={loading ? "Aprobando..." : "Firmar y aprobar"}
+              confirmLabel="Firmar y aprobar"
               onConfirm={(dataUrl) =>
                 submit({
                   action: "approve",
@@ -101,41 +119,38 @@ export function ReviewPanel({ request, contractLabel, fieldLabel }: ReviewPanelP
                 })
               }
             />
-            <Button variant="ghost" size="sm" onClick={() => setMode("idle")} disabled={loading}>
-              Cancelar
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
-      {canReview && mode === "reject" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Motivo de rechazo</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+      <Dialog
+        open={canReview && mode === "reject"}
+        onOpenChange={(open) => {
+          if (!loading) setMode(open ? "reject" : "idle");
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Motivo de rechazo</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
             <Textarea
               rows={3}
               placeholder="Explica el motivo del rechazo"
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
             />
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setMode("idle")} disabled={loading}>
-                Cancelar
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                disabled={loading || rejectionReason.trim().length < 3}
-                onClick={() => submit({ action: "reject", rejectionReason })}
-              >
-                {loading ? "Rechazando..." : "Confirmar rechazo"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            <Button
+              variant="destructive"
+              className="w-full"
+              disabled={loading || rejectionReason.trim().length < 3}
+              onClick={() => submit({ action: "reject", rejectionReason })}
+            >
+              Confirmar rechazo
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -32,7 +32,7 @@ const FEATURES = [
 
 export default function LandingPage() {
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <header className="flex items-center justify-between border-b px-6 py-4 md:px-12">
         <Image
           src="/assets/img/logo-sas.png"

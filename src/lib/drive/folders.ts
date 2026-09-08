@@ -125,8 +125,48 @@ export async function downloadFileFromDrive(fileId: string): Promise<Buffer> {
 
 export const downloadPdfFromDrive = downloadFileFromDrive;
 
-/** Elimina permanentemente un archivo de Drive (sin pasar por la papelera). */
+/**
+ * Retira un archivo de circulación mandándolo a la papelera de Drive (no `files.delete`
+ * permanente). En una Unidad compartida, `files.delete` exige rol de Organizador sobre el
+ * archivo; la cuenta de servicio normalmente solo tiene "Content Manager" (lo que pide
+ * SETUP.md), que sí alcanza para mandar a papelera pero no para el borrado permanente — y la
+ * API de Drive responde 404 "File not found" en vez de 403 cuando falta ese permiso, lo que
+ * hacía parecer (equivocadamente) un problema de tiempo/propagación. Como además se borra la
+ * referencia en Firestore, el archivo deja de ser accesible desde la app de inmediato aunque
+ * técnicamente siga en la papelera de Drive hasta que se purgue (Drive la vacía solo).
+ */
 export async function deleteDriveFile(fileId: string): Promise<void> {
   const drive = getDrive();
-  await drive.files.delete({ fileId, supportsAllDrives: true });
+  await drive.files.update({
+    fileId,
+    requestBody: { trashed: true },
+    supportsAllDrives: true,
+  });
+}
+
+/** true si la carpeta no tiene ningún contenido activo (sin contar lo ya enviado a papelera). */
+export async function isDriveFolderEmpty(folderId: string): Promise<boolean> {
+  const drive = getDrive();
+  const res = await drive.files.list({
+    q: `'${folderId}' in parents and trashed = false`,
+    fields: "files(id)",
+    pageSize: 1,
+    spaces: "drive",
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+  });
+  return (res.data.files?.length ?? 0) === 0;
+}
+
+/** Manda la carpeta de un empleado a la papelera si, tras un rechazo, quedó sin nada adentro. */
+export async function deleteEmployeeFolderIfEmpty(params: {
+  contractNumber: string;
+  fieldName: string;
+  employeeName: string;
+  date: Date;
+}): Promise<void> {
+  const folderId = await ensureLeaveRequestFolderPath(params);
+  if (await isDriveFolderEmpty(folderId)) {
+    await deleteDriveFile(folderId);
+  }
 }

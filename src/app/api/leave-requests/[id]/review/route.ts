@@ -7,8 +7,8 @@ import { logAudit } from "@/lib/audit/log";
 import { logActivity } from "@/lib/activity/log";
 import { getClientIp } from "@/lib/http/ip";
 import { generateAndArchivePdf } from "@/lib/leaveRequests/generatePdf";
-import { deleteDriveFile } from "@/lib/drive/folders";
-import type { LeaveRequest, LeaveRequestHistoryEntry } from "@/types/domain";
+import { deleteDriveFile, deleteEmployeeFolderIfEmpty } from "@/lib/drive/folders";
+import type { Contract, FieldDoc, LeaveRequest, LeaveRequestHistoryEntry } from "@/types/domain";
 
 const bodySchema = z.discriminatedUnion("action", [
   z.object({
@@ -54,8 +54,43 @@ export async function PATCH(
     // quedar nada archivado — se eliminan de Drive (best-effort) y se vacía la referencia.
     // ?? [] por compatibilidad con solicitudes creadas antes de este campo.
     const supportFiles = leaveRequest.supportFiles ?? [];
+    let deletionWarning: string | null = null;
     if (supportFiles.length > 0) {
-      await Promise.allSettled(supportFiles.map((file) => deleteDriveFile(file.driveFileId)));
+      const results = await Promise.allSettled(
+        supportFiles.map((file) => deleteDriveFile(file.driveFileId))
+      );
+      const failures = results.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
+      if (failures.length > 0) {
+        // No bloquea el rechazo (el estado ya cambió es lo importante), pero se registra para
+        // poder diagnosticar y reintentar manualmente si Drive falló (permisos, cuota, etc.).
+        console.error(
+          `No se pudieron eliminar ${failures.length}/${supportFiles.length} documentos de soporte de la solicitud ${id}:`,
+          failures.map((f) => f.reason)
+        );
+        deletionWarning =
+          "Rechazado, pero no se pudieron eliminar todos los documentos de soporte de Drive.";
+      } else {
+        // Si esta solicitud dejó su carpeta de empleado vacía (sin otros ausentismos del mismo
+        // mes con archivos propios), también se retira — best-effort, no bloquea el rechazo.
+        try {
+          const [contractSnap, fieldSnap] = await Promise.all([
+            adminDb.collection("contracts").doc(leaveRequest.contractId).get(),
+            adminDb.collection("fields").doc(leaveRequest.fieldId).get(),
+          ]);
+          const contract = contractSnap.data() as Omit<Contract, "id"> | undefined;
+          const field = fieldSnap.data() as Omit<FieldDoc, "id"> | undefined;
+          if (contract && field) {
+            await deleteEmployeeFolderIfEmpty({
+              contractNumber: contract.number,
+              fieldName: field.name,
+              employeeName: leaveRequest.employeeName,
+              date: leaveRequest.createdAt.toDate(),
+            });
+          }
+        } catch (error) {
+          console.error(`No se pudo limpiar la carpeta de empleado de la solicitud ${id}:`, error);
+        }
+      }
     }
 
     const history: LeaveRequestHistoryEntry[] = [
@@ -94,7 +129,11 @@ export async function PATCH(
       relatedEntity: { type: "leaveRequest", id },
     });
 
-    return NextResponse.json({ ok: true, data: { status: "RECHAZADO" } });
+    return NextResponse.json({
+      ok: true,
+      data: { status: "RECHAZADO" },
+      ...(deletionWarning ? { warning: deletionWarning } : {}),
+    });
   }
 
   // approve

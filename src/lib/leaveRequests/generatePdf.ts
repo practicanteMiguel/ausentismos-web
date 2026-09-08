@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "crypto";
 import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import { generateLeaveRequestPdf, TEMPLATE_VERSION } from "@/lib/pdf/leaveRequestTemplate";
@@ -54,6 +55,10 @@ export async function generateAndArchivePdf(requestId: string): Promise<void> {
 
   const uploaded = await uploadPdfToDrive({ folderId, fileName, bytes });
 
+  // Huella de integridad: si el archivo en Drive cambia un solo byte después de esto, volver a
+  // calcular su SHA-256 ya no dará este mismo valor — evidencia de que el PDF no fue alterado.
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+
   const nowTs = Timestamp.now();
   const historyEntries: LeaveRequestHistoryEntry[] = [
     { status: "PDF_GENERADO", at: nowTs, byUid: "system", byName: "Sistema" },
@@ -66,6 +71,7 @@ export async function generateAndArchivePdf(requestId: string): Promise<void> {
       webViewLink: uploaded.webViewLink,
       generatedAt: nowTs,
       templateVersion: TEMPLATE_VERSION,
+      sha256,
     },
     status: "FINALIZADO",
     history: [...leaveRequest.history, ...historyEntries],
@@ -81,7 +87,7 @@ export async function generateAndArchivePdf(requestId: string): Promise<void> {
     entityId: requestId,
     ip: null,
     userAgent: null,
-    metadata: { driveFileId: uploaded.id },
+    metadata: { driveFileId: uploaded.id, sha256 },
   });
 
   const adminsSnap = await adminDb

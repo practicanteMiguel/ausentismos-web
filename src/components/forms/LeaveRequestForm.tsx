@@ -12,6 +12,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SignaturePad } from "@/components/signature/SignaturePad";
 import { SupportFileUpload, type SupportFileValue } from "@/components/forms/SupportFileUpload";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import {
   LeaveRequestPdfPreview,
   type LeaveRequestPreviewData,
@@ -29,6 +30,16 @@ import {
   type SupportMethod,
   type WorkSchedule,
 } from "@/types/domain";
+
+/** "YYYY-MM-DD" del día de hoy en la zona horaria local del navegador (no UTC: el empleado
+ *  percibe "hoy" según su propio calendario, y así se compara contra el <input type="date">). */
+function todayLocalStr(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
 interface LeaveRequestFormProps {
   employeeName: string;
@@ -60,6 +71,7 @@ export function LeaveRequestForm({
   const [medicalMethod, setMedicalMethod] = useState<SupportMethod | "">("");
   const [nonMedicalSupportDescription, setNonMedicalSupportDescription] = useState("");
   const [supportFiles, setSupportFiles] = useState<SupportFileValue[]>([]);
+  const [today] = useState(todayLocalStr);
 
   const group = type ? LEAVE_TYPE_GROUP[type] : null;
   const isMedical = group === "MEDICO";
@@ -82,6 +94,7 @@ export function LeaveRequestForm({
     if (!type) return "Selecciona el motivo del ausentismo";
     if (isOtra && !otherReasonText.trim()) return "Especifica el motivo en “Otra ¿Cuál?”";
     if (!startDate || !endDate) return "Selecciona las fechas de inicio y fin";
+    if (startDate < today) return "La fecha de inicio no puede ser anterior a hoy";
     if (new Date(endDate) < new Date(startDate)) {
       return "La fecha fin no puede ser anterior a la fecha inicio";
     }
@@ -169,6 +182,11 @@ export function LeaveRequestForm({
 
   return (
     <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+      <LoadingOverlay
+        open={loading}
+        title="Estamos generando tu solicitud"
+        description="Espera un momento, no cierres ni recargues esta ventana."
+      />
       <div>
         {step === "form" ? (
           <Card>
@@ -229,6 +247,7 @@ export function LeaveRequestForm({
                         id="startDate"
                         type="date"
                         required
+                        min={today}
                         value={startDate}
                         onChange={(e) => handleStartDateChange(e.target.value)}
                       />
