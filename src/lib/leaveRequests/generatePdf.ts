@@ -78,10 +78,13 @@ export async function generateAndArchivePdf(requestId: string): Promise<void> {
     updatedAt: nowTs,
   });
 
+  // actorUid/actorName quedan como el empleado dueño del ausentismo (no "Sistema"): aunque quien
+  // ejecuta la generación es un proceso automático, en la auditoría lo que importa es poder
+  // identificar de quién es cada PDF generado, no que un job del servidor lo generó.
   await logAudit({
     contractId: leaveRequest.contractId,
-    actorUid: "system",
-    actorName: "Sistema",
+    actorUid: leaveRequest.employeeId,
+    actorName: leaveRequest.employeeName,
     action: "PDF_GENERATED",
     entityType: "leaveRequest",
     entityId: requestId,
